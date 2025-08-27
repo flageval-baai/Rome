@@ -1,0 +1,51 @@
+# .github/workflows/deploy.yml
+name: Deploy Next.js to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 手动触发也行
+
+# 这两行是 GitHub Pages 所需的写权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build # 如果 Next.js 配了 output:'export'，build 会直接生成 ./out
+        # 若没启 output:'export'，加一步 next export:
+        # - run: npm run export
+
+      # ① 把静态文件打包成 artifact
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages # 必须叫这个
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # ② 真正发布
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

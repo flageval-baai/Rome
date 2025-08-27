@@ -1,0 +1,76 @@
+[
+  {
+    "instance_id": "1",
+    "selected_database": "alien_large",
+    "query": "Give me a ranked list of all our observatory sites by their current observation quality. For each observatory, I need fileds: the station name, telescope ID, calculated Observation Quality Factor, any equipment problems listed together sepearated by comma, how many issues there are, and the Observational Confidence Level. Please rank them by Observation Quality Factor with the best first.",
+    "preprocess_sql": [],
+    "clean_up_sqls": [],
+    "sol_sql": [
+      "-- Intent: Evaluate combined observatory conditions and equipment status for observation quality\n-- Uses KB item 16 (OCL) and 32 (OQF), with advanced array functions\n-- Step 1: Calculate observation quality metrics using various observatory and telescope parameters\nWITH quality_assessment AS (\n    SELECT \n        o.ObservStation,\n        t.TelescRegistry,\n        o.AtmosTransparency,\n        o.HumidityRate,\n        o.WindSpeedMs,\n        o.LunarDistDeg,\n        t.EquipStatus,\n        t.CalibrStatus,\n        t.PointAccArc,\n        -- Calculate AOI from KB item 1\n        (o.AtmosTransparency * (1 - o.HumidityRate/100) * (1 - 0.02 * o.WindSpeedMs)) AS AOI,\n        -- Calculate LIF from KB item 9\n        ((1 - o.LunarDistDeg/180) * (1 - o.AtmosTransparency)) AS LIF,\n        -- Store equipment issues in array for analysis\n        ARRAY[\n            CASE WHEN t.EquipStatus != 'Degraded' THEN t.EquipStatus ELSE NULL END,\n            CASE WHEN t.CalibrStatus != 'Overdue' THEN t.CalibrStatus ELSE NULL END,\n            CASE WHEN t.CoolSysStatus != 'Warning' THEN t.CoolSysStatus ELSE NULL END\n        ] AS equipment_issues\n    FROM Observatories o\n    INNER JOIN Telescopes t ON o.ObservStation = t.ObservStation\n)\n-- Step 2: Apply OCL criteria and calculate OQF using conditional logic\nSELECT \n    qa.ObservStation,\n    qa.TelescRegistry,\n    -- Calculate OQF based on KB item 32\n    (qa.AOI * (1 - qa.LIF) * (CASE WHEN qa.PointAccArc < 2 THEN 1 ELSE 2/qa.PointAccArc END)) AS OQF,\n    -- Display equipment issues using array functions\n    ARRAY_TO_STRING(ARRAY_REMOVE(qa.equipment_issues, NULL), ', ') AS identified_issues,\n    -- Count equipment issues using array functions\n    CARDINALITY(ARRAY_REMOVE(qa.equipment_issues, NULL)) AS issue_count,\n    -- Apply OCL classification criteria from KB item 16\n    CASE \n        WHEN qa.AOI > 0.8 AND qa.EquipStatus = 'Operational' AND qa.CalibrStatus = 'Current' \n        THEN 'High'\n        WHEN qa.AOI BETWEEN 0.5 AND 0.8 \n        THEN 'Medium'\n        ELSE 'Low'\n    END AS ocl_classification\nFROM quality_assessment qa\n-- Step 3: Order by calculated quality for prioritization\nORDER BY OQF DESC;"
+    ],
+    "external_knowledge": [
+      16,
+      32,
+      55
+    ],
+    "test_cases": [],
+    "category": "Query",
+    "high_level": true,
+    "conditions": {
+      "decimal": -1,
+      "distinct": false
+    },
+    "amb_user_query": "Give me a ranked list of all our observation sites by their quality score. For each site, I need the name, telescope ID, calculated score, any equipment problems listed together, how many issues there are, and the confidence level. Please oder them.",
+    "user_query_ambiguity": {
+      "critical_ambiguity": [
+        {
+          "term": "observation sites",
+          "sql_snippet": "FROM Observatories o INNER JOIN Telescopes t ON o.ObservStation = t.ObservStation",
+          "is_mask": false,
+          "type": "schema_linking_ambiguity"
+        },
+        {
+          "term": "quality score",
+          "sql_snippet": "(qa.AOI * (1 - qa.LIF) * (CASE WHEN qa.PointAccArc < 2 THEN 1 ELSE 2/qa.PointAccArc END)) AS OQF",
+          "is_mask": true,
+          "type": "knowledge_linking_ambiguity"
+        },
+        {
+          "term": "listed together",
+          "sql_snippet": "ARRAY_TO_STRING(ARRAY_REMOVE(qa.equipment_issues, NULL), ', ') AS identified_issues",
+          "is_mask": false,
+          "type": "intent_ambiguity"
+        }
+      ],
+      "non_critical_ambiguity": [
+        {
+          "term": "order",
+          "sql_snippet": "ORDER BY OQF DESC",
+          "is_mask": false,
+          "type": "sort_ambiguity"
+        }
+      ]
+    },
+    "knowledge_ambiguity": [
+      {
+        "term": "Observational Confidence Level (OCL)",
+        "sql_snippet": "  CASE WHEN qa.aoi > 0.8 AND qa.equipstatus = 'Operational' AND qa.calibrstatus = 'Current' THEN 'High' WHEN qa.aoi BETWEEN 0.5 AND 0.8 THEN 'Medium' ELSE 'Low' END AS ocl_classification",
+        "is_mask": true,
+        "type": "knowledge_ambiguity",
+        "deleted_knowledge": 16
+      }
+    ],
+    "follow_up": {
+      "query": "Compare the observation quality between observatories with 'Clear' and 'Cloudy' weather profiles. Keep the same output fields.",
+      "sol_sql": "/* \n-- Intent: Compare observation quality between observatories with Clear vs. Cloudy weather profiles\n-- Uses KB item 16 (OCL), 32 (OQF), and 20 (WeathProfile: Clear) for weather profile context\n-- Step 1: Calculate observation quality metrics using various observatory and telescope parameters\n*/\nWITH quality_assessment AS (\n    SELECT \n        o.ObservStation,\n        t.TelescRegistry,\n        o.WeathProfile,\n        o.AtmosTransparency,\n        o.HumidityRate,\n        o.WindSpeedMs,\n        o.LunarDistDeg,\n        t.EquipStatus,\n        t.CalibrStatus,\n        t.PointAccArc,\n        -- Calculate AOI from KB item 1\n        (o.AtmosTransparency * (1 - o.HumidityRate/100) * (1 - 0.02 * o.WindSpeedMs)) AS AOI,\n        -- Calculate LIF from KB item 9\n        ((1 - o.LunarDistDeg/180) * (1 - o.AtmosTransparency)) AS LIF,\n        -- Store equipment issues in array for analysis\n        ARRAY[\n            CASE WHEN t.EquipStatus != 'Degraded' THEN t.EquipStatus ELSE NULL END,\n            CASE WHEN t.CalibrStatus != 'Overdue' THEN t.CalibrStatus ELSE NULL END,\n            CASE WHEN t.CoolSysStatus != 'Warning' THEN t.CoolSysStatus ELSE NULL END\n        ] AS equipment_issues\n    FROM Observatories o\n    INNER JOIN Telescopes t ON o.ObservStation = t.ObservStation\n    WHERE o.WeathProfile IN ('Clear', 'Cloudy')  -- Filter for Clear and Cloudy weather profiles\n)\n-- Step 2: Apply OCL criteria, calculate OQF, and compare by weather profile\nSELECT \n    qa.ObservStation,\n    qa.TelescRegistry,\n    qa.WeathProfile,\n    -- Calculate OQF based on KB item 32\n    (qa.AOI * (1 - qa.LIF) * (CASE WHEN qa.PointAccArc < 2 THEN 1 ELSE 2/qa.PointAccArc END)) AS OQF,\n    -- Display equipment issues using array functions\n    ARRAY_TO_STRING(ARRAY_REMOVE(qa.equipment_issues, NULL), ', ') AS identified_issues,\n    -- Count equipment issues using array functions\n    CARDINALITY(ARRAY_REMOVE(qa.equipment_issues, NULL)) AS issue_count,\n    -- Apply OCL classification criteria from KB item 16\n    CASE \n        WHEN qa.AOI > 0.8 AND qa.EquipStatus = 'Operational' AND qa.CalibrStatus = 'Current' \n        THEN 'High'\n        WHEN qa.AOI BETWEEN 0.5 AND 0.8 \n        THEN 'Medium'\n        ELSE 'Low'\n    END AS ocl_classification\nFROM quality_assessment qa\n-- Step 3: Order by weather profile and then by OQF for comparison\nORDER BY qa.WeathProfile, OQF DESC;",
+      "external_knowledge": [
+        20
+      ],
+      "type": "topic_pivot",
+      "test_cases": [],
+      "category": "Query",
+      "difficulty_tier": "Medium"
+    },
+    "difficulty_tier": "Medium"
+  }
+]

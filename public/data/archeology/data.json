@@ -1,0 +1,141 @@
+[
+  {
+    "instance_id": "7",
+    "selected_database": "archeology",
+    "query": "Show me each site's code and name, along with the average temperature, humidity, and illumination levels. I'd also like to see the average Environmental Suitability Index for each site, classified into quartiles, to understand the range of conditions. Finally, classify each site into Environmental Condition Classification System according to average ESI value.",
+    "preprocess_sql": [],
+    "clean_up_sqls": [],
+    "sol_sql": [
+      "\n/*\n * SQL Intent: Analyze environmental conditions at scanning sites to determine optimal scanning locations\n * Knowledge Used: #7 (Environmental Suitability Index - ESI), #15 (Optimal Scanning Conditions) #50\n * Advanced Functions: ABS(), POWER(), CASE expressions, Window functions (NTILE())\n */\n\n-- Step 1: Calculate Environmental Suitability Index (ESI) for each environment record\nWITH environment_analysis AS (\n    SELECT \n        se.zoneref AS site_code,\n        se.ambictemp,\n        se.humepct,\n        se.illumelux,\n        -- Calculate ESI based on Knowledge #7\n        100 - 2.5 * ABS(se.ambictemp - 20) - \n        POWER(ABS((se.humepct - 50) / 2), 1.5) - \n        600 / (se.illumelux + 100) AS esi\n    FROM scanenvironment se\n)\n\n-- Step 2: Aggregate environmental metrics by site and classify scanning conditions\nSELECT \n    s.zoneregistry AS site_code,\n    s.zonelabel AS site_name,\n    ROUND(AVG(ea.ambictemp)::numeric, 1) AS avg_temperature_c,\n    ROUND(AVG(ea.humepct)::numeric, 1) AS avg_humidity_pct,\n    ROUND(AVG(ea.illumelux)::numeric, 1) AS avg_illumination_lux,\n    ROUND(AVG(ea.esi)::numeric, 1) AS avg_esi,\n    -- Categorize sites by environmental suitability quartile\n    NTILE(4) OVER (ORDER BY AVG(ea.esi)) AS esi_quartile,\n    -- Classify scanning conditions based on Knowledge #15\n    CASE \n        WHEN AVG(ea.esi) > 85 THEN 'Optimal Scanning Conditions'\n        WHEN AVG(ea.esi) > 70 THEN 'Good Scanning Conditions'\n        WHEN AVG(ea.esi) > 50 THEN 'Acceptable Scanning Conditions'\n        ELSE 'Challenging Scanning Conditions'\n    END AS scanning_condition_class,\nFROM sites s\nJOIN environment_analysis ea ON s.zoneregistry = ea.site_code\nGROUP BY s.zoneregistry, s.zonelabel\nORDER BY avg_esi DESC;\n"
+    ],
+    "external_knowledge": [
+      7,
+      15,
+      50
+    ],
+    "test_cases": [],
+    "category": "Query",
+    "high_level": false,
+    "conditions": {
+      "decimal": 1,
+      "distinct": false
+    },
+    "amb_user_query": "Show me each site's basci information, along with the average temperature, humidity, and illumination levels. I'd also like to see the average suitability for each site, classified into quartiles, to understand the range of conditions. Finally, classify each site into environmental condition categories.",
+    "user_query_ambiguity": {
+      "critical_ambiguity": [
+        {
+          "term": "basic information",
+          "sql_snippet": "SELECT    s.zoneregistry AS site_code,    s.zonelabel AS site_name,",
+          "is_mask": false,
+          "type": "intent_ambiguity"
+        },
+        {
+          "term": "average suitability",
+          "sql_snippet": "ROUND(AVG(ea.esi)::numeric, 1) AS avg_esi",
+          "is_mask": true,
+          "type": "knowledge_linking_ambiguity"
+        },
+        {
+          "term": "environmental condition categories",
+          "sql_snippet": "CASE WHEN AVG(ea.esi) > 85 THEN 'Optimal Scanning Conditions' WHEN AVG(ea.esi) > 70 THEN 'Good Scanning Conditions' WHEN AVG(ea.esi) > 50 THEN 'Acceptable Scanning Conditions' ELSE 'Challenging Scanning Conditions' END AS scanning_condition_class, CASE WHEN MAX(ea.ambictemp) - MIN(ea.ambictemp) > 10 THEN 'High Temperature Variation' ELSE 'Stable Temperature' END AS temperature_stability",
+          "is_mask": false,
+          "type": "intent_ambiguity"
+        }
+      ],
+      "non_critical_ambiguity": [
+        {
+          "term": "decimal",
+          "sql_snippet": "ROUND(AVG(ea.ambictemp)::numeric, 1)",
+          "is_mask": false,
+          "type": "decimal_ambiguity"
+        },
+        {
+          "term": "sort",
+          "sql_snippet": "ORDER BY avg_esi DESC",
+          "is_mask": false,
+          "type": "sort_ambiguity"
+        }
+      ]
+    },
+    "knowledge_ambiguity": [
+      {
+        "term": "Environmental Suitability Index (ESI)",
+        "sql_snippet": "100 - 2.5 * ABS(se.ambictemp - 20) - POWER(ABS((se.humepct - 50) / 2), 1.5) - 600 / (se.illumelux + 100) AS esi",
+        "is_mask": false,
+        "type": "knowledge_ambiguity",
+        "deleted_knowledge": 7
+      }
+    ],
+    "follow_up": {
+      "query": "I just want the sites that fall under ‘Optimal Scanning Conditions,’ show me their code, name, average ESI, the number of distinct scans carried out, and the first and last scan dates in the format of 'year-month-day'.",
+      "sol_sql": "/* ---------------------------------------------------------------\n * Purpose : From the sites that qualified as “Optimal Scanning Conditions”\n *           in the previous result, show how many distinct scans\n *           have been carried out and the time-span these scans cover.\n * Knowledge used : #7 (ESI), #15 (Optimal Scanning Conditions), #50 (ECCS)\n * Advanced SQL   : ABS(), POWER(), DATE functions, window agg., TO_CHAR\n * --------------------------------------------------------------- */\nWITH environment_analysis AS (      -- 1. compute ESI for every record\n    SELECT \n        se.zoneref                          AS site_code,\n        se.ambictemp,\n        se.humepct,\n        se.illumelux,\n        100\n        - 2.5 * ABS(se.ambictemp - 20)\n        - POWER(ABS((se.humepct - 50) / 2), 1.5)\n        - 600 / (se.illumelux + 100)        AS esi          -- KB-7\n    FROM scanenvironment  se\n),\nsite_esi AS (                       -- 2. average ESI per site\n    SELECT \n        s.zoneregistry               AS site_code,\n        s.zonelabel                  AS site_name,\n        AVG(ea.esi)                  AS avg_esi\n    FROM sites               s\n    JOIN environment_analysis ea\n          ON ea.site_code = s.zoneregistry\n    GROUP BY s.zoneregistry, s.zonelabel\n),\noptimal_sites AS (                  -- 3. keep only “Optimal” (>85, KB-15/50)\n    SELECT *\n    FROM site_esi\n    WHERE avg_esi > 85\n)\nSELECT\n    os.site_code,\n    os.site_name,\n    ROUND(os.avg_esi, 1)                       AS avg_esi,\n    COUNT(DISTINCT sc.questregistry)           AS total_scans,\n    TO_CHAR(MIN(sc.chronotag), 'YYYY-MM-DD')   AS first_scan_date,\n    TO_CHAR(MAX(sc.chronotag), 'YYYY-MM-DD')   AS last_scan_date\nFROM optimal_sites     os\nLEFT JOIN scans        sc  ON sc.zoneref = os.site_code\nGROUP BY os.site_code, os.site_name, os.avg_esi\nORDER BY total_scans DESC, os.avg_esi DESC;",
+      "external_knowledge": [],
+      "type": "result_based",
+      "test_cases": [],
+      "category": "Query",
+      "difficulty_tier": "Hard"
+    },
+    "difficulty_tier": "Medium"
+  },
+  {
+    "instance_id": "M_3",
+    "selected_database": "archeology",
+    "query": "Create a view called view_premium_quality_scans that identifies high-quality archaeological scans. This view should include the Scan ID, Project Reference, Site Reference, Scan Timestamp, Scan Resolution (mm), Point Density (points/m²), Coverage (%), Overlap (%), and Noise Level (dB). Please include all scans, even those that may not yet have associated point cloud data. The view should identify scans that meet the criteria for both a High Resolution Scan and Comprehensive Coverage, and also have a Noise Level less than 1.5.",
+    "preprocess_sql": [],
+    "clean_up_sqls": [],
+    "sol_sql": [
+      "\n-- Intent: Provide an easy way to query scans meeting the criteria for 'Premium Quality'.\n-- KB Used: KB 10 (High Resolution), KB 11 (Comprehensive Coverage)\n-- Advanced Features: CREATE VIEW, JOIN (LEFT JOIN), Multiple conditions\n\n-- Step 1: Define the view structure.\n-- Step 2: Join scans and scanpointcloud tables to access necessary metrics.\n-- Step 3: Apply the criteria from KB 10 (Resolution, Density) and KB 11 (Coverage, Overlap).\nCREATE OR REPLACE VIEW view_premium_quality_scans AS\nSELECT\n    s.QuestRegistry,\n    s.ArcRef,\n    s.ZoneRef,\n    s.ChronoTag,\n    spc.ScanResolMm,\n    spc.PointDense,\n    spc.CoverPct,\n    spc.LapPct,\n    spc.NoiseDb\nFROM\n    public.scans s\nLEFT JOIN -- Use LEFT JOIN in case some scans don't have point cloud data yet\n    public.scanpointcloud spc ON s.ArcRef = spc.ArcRef AND s.CrewRef = spc.CrewRef -- Adjust join keys as needed\nWHERE\n    -- Step 3a: Apply High Resolution criteria (KB 10)\n    spc.ScanResolMm <= 1.0 AND spc.PointDense >= 1000\n    -- Step 3b: Apply Comprehensive Coverage criteria (KB 11)\n    AND spc.CoverPct >= 95.0 AND spc.LapPct >= 30.0\n    -- Step 3c: Add a basic noise check\n    AND spc.NoiseDb < 1.5; -- Example threshold for low noise\n"
+    ],
+    "external_knowledge": [
+      10,
+      11
+    ],
+    "test_cases": [
+      "\ndef test_case(pred_sqls, sol_sqls, db_name, conn):\n    pred_query_result = execute_queries(pred_sqls, db_name, conn)\n    query= [\n    \"\"\"\n    SELECT *\n    FROM view_premium_quality_scans\n    \"\"\"\n    ]\n    test_result = execute_queries(query, db_name, conn)\n    assert test_result \n    assert test_result[0][0][0] == 'ASD996783'\n    assert test_result[0][0][1] == 'PR9945'\n    assert test_result[0][0][2] == 'SC5229'\n    assert len(test_result[0][0]) == 9\n    return 1\n"
+    ],
+    "category": "Management",
+    "high_level": false,
+    "conditions": {
+      "decimal": -1,
+      "distinct": false
+    },
+    "amb_user_query": "Create a view called view_premium_quality_scans for good quality scans with information about scan ID, project, site, timestamp, resolution, density, coverage, overlap, and noise level. Include all scans. The view should identify scans with good quality and noise below 1.5.",
+    "user_query_ambiguity": {
+      "critical_ambiguity": [
+        {
+          "term": "good quality",
+          "sql_snippet": "WHERE spc.ScanResolMm <= 1.0 AND spc.PointDense >= 1000 AND spc.CoverPct >= 95.0 AND spc.LapPct >= 30.0",
+          "is_mask": true,
+          "type": "knowledge_linking_ambiguity"
+        }
+      ],
+      "non_critical_ambiguity": [
+        {
+          "term": "all scans",
+          "sql_snippet": "LEFT JOIN public.scanpointcloud spc ON s.ArcRef = spc.ArcRef AND s.CrewRef = spc.CrewRef",
+          "is_mask": false,
+          "type": "join_ambiguity"
+        }
+      ]
+    },
+    "knowledge_ambiguity": [
+      {
+        "term": "High Resolution Scan",
+        "sql_snippet": "spc.ScanResolMm <= 1.0 AND spc.PointDense >= 1000",
+        "is_mask": true,
+        "type": "knowledge_ambiguity",
+        "deleted_knowledge": 10
+      }
+    ],
+    "follow_up": {
+      "query": "Now show me the site names along with the count of these premium quality scans per site, the average resolution and noise level for each site. Sort the results by scan count (highest first) and then by resolution (best first).",
+      "sol_sql": "SELECT \n    zs.zonelabel AS site_name,\n    COUNT(*) AS premium_scan_count,\n    AVG(vps.scanresolmm) AS avg_resolution,\n    AVG(vps.noisedb) AS avg_noise_level\nFROM \n    view_premium_quality_scans vps\nJOIN \n    sites zs ON vps.zoneref = zs.zoneregistry\nGROUP BY \n    zs.zonelabel\nORDER BY \n    premium_scan_count DESC, avg_resolution ASC;",
+      "external_knowledge": [],
+      "type": "result_based",
+      "test_cases": [],
+      "category": "Query",
+      "difficulty_tier": "Easy"
+    },
+    "difficulty_tier": "Easy"
+  }
+]

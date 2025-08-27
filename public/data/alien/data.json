@@ -1,0 +1,139 @@
+[
+  {
+    "instance_id": "5",
+    "selected_database": "alien",
+    "query": "Show me a breakdown of signal modulation types with at least 5 occurrences. For each modulation type, display the modulation type, the number of signals, the average Modulation Complexity Score (MCS), and average signal-to-noise ratio (SNR). Also include a detailed JSON with each signal's MCS and SNR values. Keys are the signal record IDs, and values are inner objects containing two fields: `mcs` – the signal’s MCS value, and `snr` – the SNR value.",
+    "preprocess_sql": [],
+    "clean_up_sqls": [],
+    "sol_sql": [
+      "/*\nIntent: Evaluate effectiveness of different modulation types\nKnowledge Used: MCS (id:30)\nAdvanced Features: JSON functions, advanced aggregation\n*/\nSELECT \n    s.ModType,\n    COUNT(*) AS signal_count,\n    AVG(s.ModIndex * (1 + (1 - ABS(s.FreqDriftHzs)/(s.FreqMhz*1000)) * \n        s.SigDurSec/(1 + s.DoppShiftHz/1000)) *\n        CASE \n            WHEN s.ModType = 'AM' THEN 2\n            WHEN s.ModType = 'FM' THEN 1.5\n            ELSE 1\n        END) AS avg_mcs,\n    AVG(s.SnrRatio) AS avg_snr,\n    JSON_OBJECT_AGG(\n        s.SignalRegistry,\n        JSON_BUILD_OBJECT(\n            'mcs', s.ModIndex * (1 + (1 - ABS(s.FreqDriftHzs)/(s.FreqMhz*1000)) * \n                   s.SigDurSec/(1 + s.DoppShiftHz/1000)) *\n                   CASE \n                       WHEN s.ModType = 'AM' THEN 2\n                       WHEN s.ModType = 'FM' THEN 1.5\n                       ELSE 1\n                   END,\n            'snr', s.SnrRatio\n        )\n    ) AS signal_details\nFROM Signals s\nWHERE s.ModType IS NOT NULL\nGROUP BY s.ModType\nHAVING COUNT(*) > 5;"
+    ],
+    "external_knowledge": [
+      30
+    ],
+    "test_cases": [],
+    "category": "Query",
+    "high_level": true,
+    "conditions": {
+      "decimal": -1,
+      "distinct": false
+    },
+    "amb_user_query": "Show me a breakdown of signal encoding methods with several occurrences. For each method, display the type, the count, the average complexity measure, and average quality ratio. Also include signal details.",
+    "user_query_ambiguity": {
+      "critical_ambiguity": [
+        {
+          "term": "signal encoding methods",
+          "sql_snippet": "s.ModType",
+          "is_mask": false,
+          "type": "schema_linking_ambiguity"
+        },
+        {
+          "term": "complexity measure",
+          "sql_snippet": "AVG(s.ModIndex * (1 + (1 - ABS(s.FreqDriftHzs)/(s.FreqMhz*1000)) * s.SigDurSec/(1 + s.DoppShiftHz/1000)) * CASE WHEN s.ModType = 'AM' THEN 2 WHEN s.ModType = 'FM' THEN 1.5 ELSE 1 END",
+          "is_mask": true,
+          "type": "knowledge_linking_ambiguity"
+        },
+        {
+          "term": "quality ratio",
+          "sql_snippet": "AVG(s.SnrRatio)",
+          "is_mask": false,
+          "type": "semantic_ambiguity"
+        },
+        {
+          "term": "signal details",
+          "sql_snippet": "JSON_OBJECT_AGG(s.SignalRegistry,JSON_BUILD_OBJECT('mcs', s.ModIndex * (1 + (1 - ABS(s.FreqDriftHzs) / (s.FreqMhz * 1000)) * s.SigDurSec / (1 + s.DoppShiftHz / 1000) *CASE WHEN s.ModType = 'AM' THEN 2WHEN s.ModType = 'FM' THEN 1.5ELSE 1END,'snr', s.SnrRatio)) AS signal_details",
+          "is_mask": true,
+          "type": "semantic_ambiguity"
+        }
+      ],
+      "non_critical_ambiguity": [
+        {
+          "term": "null",
+          "sql_snippet": "WHERE s.ModType IS NOT NULL",
+          "is_mask": false,
+          "type": "null_ambiguity"
+        }
+      ]
+    },
+    "knowledge_ambiguity": [
+      {
+        "term": "Modulation Complexity Score (MCS)",
+        "sql_snippet": "AVG(s.ModIndex * (1 + (1 - ABS(s.FreqDriftHzs)/(s.FreqMhz*1000)) * s.SigDurSec/(1 + s.DoppShiftHz/1000)) * CASE WHEN s.ModType = 'AM' THEN 2 WHEN s.ModType = 'FM' THEN 1.5 ELSE 1 END) AS avg_mcs",
+        "is_mask": false,
+        "type": "knowledge_ambiguity",
+        "deleted_knowledge": 30
+      }
+    ],
+    "follow_up": {
+      "query": "Filter the breakdown to include only analyzable signals, while still showing other metrics",
+      "sol_sql": "/*\nIntent: Evaluate effectiveness of different modulation types with additional constraint\nKnowledge Used: MCS (id:30), SSM (id:7), Analyzable Signals (id:50), SNQI (id:0)\nAdvanced Features: JSON functions, advanced aggregation\n*/\nSELECT \n    s.ModType,\n    COUNT(*) AS signal_count,\n    AVG(s.ModIndex * (1 + (1 - ABS(s.FreqDriftHzs)/(s.FreqMhz*1000)) * \n        s.SigDurSec/(1 + s.DoppShiftHz/1000)) *\n        CASE \n            WHEN s.ModType = 'AM' THEN 2\n            WHEN s.ModType = 'FM' THEN 1.5\n            ELSE 1\n        END) AS avg_mcs,\n    AVG(s.SnrRatio) AS avg_snr,\n    JSON_OBJECT_AGG(\n        s.SignalRegistry,\n        JSON_BUILD_OBJECT(\n            'mcs', s.ModIndex * (1 + (1 - ABS(s.FreqDriftHzs)/(s.FreqMhz*1000)) * \n                   s.SigDurSec/(1 + s.DoppShiftHz/1000)) *\n                   CASE \n                       WHEN s.ModType = 'AM' THEN 2\n                       WHEN s.ModType = 'FM' THEN 1.5\n                       ELSE 1\n                   END,\n            'snr', s.SnrRatio\n        )\n    ) AS signal_details\nFROM Signals s\nWHERE s.ModType IS NOT NULL\n  AND (s.SnrRatio - 0.1 * ABS(s.NoiseFloorDbm)) > 0  -- SNQI > 0 for analyzable signals\nGROUP BY s.ModType\nHAVING COUNT(*) > 5;",
+      "external_knowledge": [
+        50
+      ],
+      "type": "constraint_change",
+      "test_cases": [],
+      "category": "Query",
+      "difficulty_tier": "Medium"
+    },
+    "difficulty_tier": "Medium"
+  },
+  {
+    "instance_id": "M_1",
+    "selected_database": "alien",
+    "query": "Create a PostgreSQL function called 'calculate_disf' that computes the Detection Instrument Sensitivity Factor (DISF) and return the calculated value.",
+    "preprocess_sql": [],
+    "clean_up_sqls": [],
+    "sol_sql": [
+      "-- Create a function to calculate Detection Instrument Sensitivity Factor (DISF).\n-- Intent: Define a function that computes DISF using telescope environmental data and then test it.\n-- Step 1: Create the function \"calculate_disf\" using PL/pgSQL.\n--         Inputs: AirTempC, AtmosTransparency, HumidityRate, LunarDistDeg.\n--         Calculation: DISF = (10 - |AirTempC - 15|/10) * AtmosTransparency * (1 - HumidityRate/200) * ((100 - LunarDistDeg)/100)\n-- Knowledge Used:\n--   \"Detection Instrument Sensitivity Factor (DISF)\" [KB id:5] and advanced procedural language features.\nCREATE OR REPLACE FUNCTION calculate_disf(\n    p_airtemp NUMERIC, \n    p_trans NUMERIC, \n    p_humidity NUMERIC, \n    p_lunar_deg NUMERIC\n) RETURNS NUMERIC AS $$\nDECLARE\n    v_disf NUMERIC;\nBEGIN\n    -- Calculate the DISF based on the given formula.\n    v_disf := (10 - ABS(p_airtemp - 15)/10) * p_trans * (1 - p_humidity/200) * ((100 - p_lunar_deg)/100);\n    RETURN v_disf;\nEND;\n$$ LANGUAGE plpgsql;\n"
+    ],
+    "external_knowledge": [
+      5
+    ],
+    "test_cases": [
+      "\ndef test_case(pred_sqls, sol_sqls, db_name, conn):\n    # The expected DISF value computed for inputs: AirTempC = 20, p_trans = 0.95, p_humidity = 45, p_lunar_deg = 60.\n    # Calculation:\n    #   factor1 = 10 - ABS(20 - 15)/10 = 10 - 5/10 = 10 - 0.5 = 9.5\n    #   factor2 = 0.95\n    #   factor3 = 1 - 45/200 = 1 - 0.225 = 0.775\n    #   factor4 = (100 - 60)/100 = 40/100 = 0.4\n    # Expected DISF = 9.5 * 0.95 * 0.775 * 0.4 ≈ 2.79775\n    expected_disf = 2.79775\n    tolerance = 0.00001  # Allowable floating-point error\n    \n    # Execute a SELECT to call calculate_disf with given parameters.\n    pred_result, _, _ = execute_queries(\"SELECT calculate_disf(20, 0.95, 45, 60);\", db_name, conn)\n    # Expecting pred_result to be a list with one tuple containing the computed value.\n    predicted_value = float(pred_result[0][0])\n    \n    # Step 3: Assert that the predicted value matches the expected DISF.\n    assert abs(predicted_value - expected_disf) < tolerance, (\n        f\"Predicted DISF value {predicted_value} differs from expected {expected_disf}\"\n    )\n    "
+    ],
+    "category": "Management",
+    "high_level": false,
+    "conditions": {
+      "decimal": -1,
+      "distinct": false
+    },
+    "amb_user_query": "Develop a PL/pgSQL routine called 'calculate_disf' that computes the sensitivity factor and return the calculated value.",
+    "user_query_ambiguity": {
+      "critical_ambiguity": [
+        {
+          "term": "routine",
+          "sql_snippet": "CREATE OR REPLACE FUNCTION calculate_disf(",
+          "is_mask": false,
+          "type": "intent_ambiguity"
+        },
+        {
+          "term": "sensitivity factor",
+          "sql_snippet": "v_disf := (10 - ABS(p_airtemp - 15)/10) * p_trans * (1 - p_humidity/200) * ((100 - p_lunar_deg)/100)",
+          "is_mask": true,
+          "type": "knowledge_linking_ambiguity"
+        }
+      ],
+      "non_critical_ambiguity": []
+    },
+    "knowledge_ambiguity": [
+      {
+        "term": "Detection Instrument Sensitivity Factor (DISF)",
+        "sql_snippet": "v_disf := (10 - ABS(p_airtemp - 15)/10) * p_trans * (1 - p_humidity/200) * ((100 - p_lunar_deg)/100)",
+        "is_mask": true,
+        "type": "knowledge_ambiguity",
+        "deleted_knowledge": 5
+      }
+    ],
+    "follow_up": {
+      "query": "Can you modify the function and add an optional minimum threshold parameter (defaulting to 0) to ensure the returned DISF value is never below this threshold?",
+      "sol_sql": "\n    CREATE OR REPLACE FUNCTION calculate_disf(\n    p_airtemp NUMERIC, \n    p_trans NUMERIC, \n    p_humidity NUMERIC, \n    p_lunar_deg NUMERIC,\n    p_min_value NUMERIC DEFAULT 0\n) RETURNS NUMERIC AS $$\nDECLARE\n    v_disf NUMERIC;\nBEGIN\n    -- Calculate the DISF based on the given formula.\n    v_disf := (10 - ABS(p_airtemp - 15)/10) * p_trans * (1 - p_humidity/200) * ((100 - p_lunar_deg)/100);\n    \n    -- Return the maximum of calculated value or minimum threshold\n    RETURN GREATEST(v_disf, p_min_value);\nEND;\n$$ LANGUAGE plpgsql;",
+      "external_knowledge": [],
+      "test_cases": [
+        "\n    def test_case(pred_sqls, sol_sqls, db_name, conn):      \n    # Test normal case\n    result1 = execute_queries(\"SELECT calculate_disf(20, 0.8, 50, 90, 5)\", db_name, conn)[0]\n    assert result1[0][0] == 5, \"Function should respect minimum threshold\"\n    \n    # Test case where calculated value is above threshold\n    result2 = execute_queries(\"SELECT calculate_disf(15, 1.0, 0, 100, -1)\", db_name, conn)[0]\n    assert result2[0][0] == 0, \"Function should return calculated value when above threshold\"\n    \n    # Test edge case\n    result3 = execute_queries(\"SELECT calculate_disf(-100, 0.1, 100, 0, 0)\", db_name, conn)[0]\n    assert result3[0][0] == 0, \"Function should handle edge cases correctly\"\n    "
+      ],
+      "type": "constraint_change",
+      "category": "Management"
+    }
+  }
+]

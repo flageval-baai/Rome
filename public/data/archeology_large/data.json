@@ -1,0 +1,89 @@
+[
+  {
+    "instance_id": "1",
+    "selected_database": "archeology_large",
+    "query": "For each archaeological site, I need its Point Cloud Density Ratio and Feature Extraction Efficiency to identify sites with high potential for feature extraction. Please include the site code, average PCDR value, and average FEE value. Ensure that all sites are included, even if some data might be missing. Sort the results by average FEE in descending order.",
+    "preprocess_sql": [],
+    "clean_up_sqls": [],
+    "sol_sql": [
+      "\n/*\n * SQL Intent: Identify sites with high potential for feature extraction based on point cloud characteristics.\n * Knowledge Used: #2 (Point Cloud Density Ratio - PCDR), #32 (Feature Extraction Efficiency - FEE)\n * Advanced Functions: POWER(), NULLIF(), ROUND()\n * Difficulty: Normal\n */\nWITH feature_potential AS (\n    -- Step 1: Calculate Point Cloud Density Ratio (PCDR) for each scan, using TotalPts, CloudDense, and AreaM2 from relevant tables.\n    SELECT\n        s.zoneref AS site_code,\n        spc.totalpts,\n        spc.clouddense,\n        ss.aream2,\n        CASE\n            WHEN spc.clouddense > 0 AND ss.aream2 > 0 THEN spc.totalpts / (spc.clouddense * ss.aream2)\n            ELSE 0  -- Handle cases where division by zero might occur\n        END AS pcdr\n    FROM sites si\n    LEFT JOIN scans s ON si.zoneregistry = s.zoneref\n    LEFT JOIN scanpointcloud spc ON s.arcref = spc.arcref\n    LEFT JOIN scanspatial ss ON s.arcref = ss.arcref\n),\nextraction_metrics AS (\n    -- Step 2: Calculate Feature Extraction Efficiency (FEE) using PCDR and feature counts from scanfeatures.\n    SELECT\n        fp.site_code,\n        fp.pcdr,\n        sf.traitcount,\n        sf.articount,\n        CASE\n            WHEN fp.pcdr > 0 THEN (sf.traitcount + sf.articount) / (fp.pcdr * SQRT(fp.clouddense)) * 1000\n            ELSE 0  -- Handle cases where division by zero might occur\n        END AS fee\n    FROM feature_potential fp\n    JOIN scanfeatures sf ON fp.site_code = sf.zoneref\n)\n-- Step 3: Aggregate and present the results, calculating average PCDR and FEE for each site.\nSELECT\n    site_code,\n    ROUND(AVG(pcdr)::numeric, 2) AS avg_pcdr,\n    ROUND(AVG(fee)::numeric, 2) AS avg_fee\nFROM extraction_metrics\nGROUP BY site_code\nORDER BY avg_fee DESC;\n"
+    ],
+    "external_knowledge": [
+      2,
+      32
+    ],
+    "test_cases": [],
+    "category": "Query",
+    "high_level": false,
+    "conditions": {
+      "decimal": 2,
+      "distinct": false
+    },
+    "amb_user_query": "For each archaeological site, I need its density ratio and extraction efficiency to identify sites with high potential for feature extraction. Please include the site code, average density value, and average extraction value.",
+    "user_query_ambiguity": {
+      "critical_ambiguity": [
+        {
+          "term": "density ratio",
+          "sql_snippet": "CASE WHEN spc.clouddense > 0 AND ss.aream2 > 0 THEN spc.totalpts / (spc.clouddense * ss.aream2) ELSE 0 END AS pcdr",
+          "is_mask": false,
+          "type": "knowledge_linking_ambiguity"
+        },
+        {
+          "term": "extraction efficiency",
+          "sql_snippet": "CASE WHEN fp.pcdr > 0 THEN (sf.traitcount + sf.articount) / (fp.pcdr * SQRT(fp.clouddense)) * 1000 ELSE 0 END AS fee",
+          "is_mask": false,
+          "type": "intent_ambiguity"
+        }
+      ],
+      "non_critical_ambiguity": [
+        {
+          "term": "decimal",
+          "sql_snippet": "ROUND(AVG(pcdr)::numeric, 2)",
+          "is_mask": false,
+          "type": "decimal_ambiguity"
+        },
+        {
+          "term": "join",
+          "sql_snippet": "LEFT JOIN scans s ON si.zoneregistry = s.zoneref",
+          "is_mask": false,
+          "type": "join_ambiguity"
+        },
+        {
+          "term": "sort",
+          "sql_snippet": "ORDER BY avg_fee DESC",
+          "is_mask": false,
+          "type": "sort_ambiguity"
+        }
+      ]
+    },
+    "knowledge_ambiguity": [
+      {
+        "term": "Point Cloud Density Ratio (PCDR)",
+        "sql_snippet": "CASE WHEN spc.clouddense > 0 AND ss.aream2 > 0 THEN spc.totalpts / (spc.clouddense * ss.aream2) ELSE 0",
+        "is_mask": false,
+        "type": "knowledge_ambiguity",
+        "deleted_knowledge": 2
+      },
+      {
+        "term": "Feature Extraction Efficiency (FEE)",
+        "sql_snippet": "CASE WHEN fp.pcdr > 0 THEN (sf.traitcount + sf.articount) / (fp.pcdr * SQRT(fp.clouddense)) * 1000 ELSE 0",
+        "is_mask": true,
+        "type": "knowledge_ambiguity",
+        "deleted_knowledge": 32
+      }
+    ],
+    "follow_up": {
+      "query": "Now also calculate each site’s average Environmental Suitability Index (ESI) and show which ECCS tier it belongs to.",
+      "sol_sql": "/*\n * Adds Environmental Suitability Index (ESI) and ECCS tier to the\n * per-site metrics computed in the first round.\n * New knowledge used:\n *   #7  – Environmental Suitability Index (ESI)\n *   #50 – Environmental Condition Classification System (ECCS)\n */\n\nWITH feature_potential AS (              -- identical to 1st-round CTE\n    SELECT\n        s.zoneref                    AS site_code,\n        spc.totalpts,\n        spc.clouddense,\n        ss.aream2,\n        CASE\n            WHEN spc.clouddense > 0\n              AND ss.aream2     > 0  THEN spc.totalpts / (spc.clouddense * ss.aream2)\n            ELSE 0\n        END                          AS pcdr\n    FROM   sites si\n    LEFT   JOIN scans           s  ON si.zoneregistry = s.zoneref\n    LEFT   JOIN scanpointcloud  spc ON s.arcref = spc.arcref\n    LEFT   JOIN scanspatial     ss  ON s.arcref = ss.arcref\n),\nextraction_metrics AS (                  -- identical to 1st-round CTE\n    SELECT\n        fp.site_code,\n        fp.pcdr,\n        fp.clouddense,\n        sf.traitcount,\n        sf.articount,\n        CASE\n            WHEN fp.pcdr > 0 THEN\n                (sf.traitcount + sf.articount) /\n                (fp.pcdr * SQRT(fp.clouddense)) * 1000\n            ELSE 0\n        END                            AS fee\n    FROM   feature_potential fp\n    JOIN   scanfeatures      sf ON fp.site_code = sf.zoneref\n),\nenv_readings AS (                        -- compute ESI for every environment record\n    SELECT\n        se.zoneref              AS site_code,\n        100\n          - 2.5 * ABS(se.ambictemp - 20)\n          - POWER(ABS((se.humepct - 50) / 2.0), 1.5)\n          - 600.0 / (se.illumelux + 100)        AS esi\n    FROM   scanenvironment se\n),\nenv_site_avg AS (                        -- average ESI per site\n    SELECT site_code,\n           AVG(esi) AS avg_esi\n    FROM   env_readings\n    GROUP  BY site_code\n),\nsite_metrics AS (                        -- pull everything together\n    SELECT\n        em.site_code,\n        ROUND(AVG(em.pcdr)::numeric, 2)      AS avg_pcdr,\n        ROUND(AVG(em.fee )::numeric, 2)      AS avg_fee,\n        ROUND(COALESCE(es.avg_esi, 0)::numeric, 2) AS avg_esi\n    FROM   extraction_metrics em\n    LEFT   JOIN env_site_avg es ON em.site_code = es.site_code\n    GROUP  BY em.site_code, es.avg_esi\n)\nSELECT\n    site_code,\n    avg_pcdr,\n    avg_fee,\n    avg_esi,\n    CASE                                            -- ECCS tier (#50)\n        WHEN avg_esi > 85 THEN 'Optimal Scanning Conditions'\n        WHEN avg_esi > 70 THEN 'Good Scanning Conditions'\n        WHEN avg_esi > 50 THEN 'Acceptable Scanning Conditions'\n        ELSE                        'Challenging Scanning Conditions'\n    END AS scanning_condition_tier\nFROM   site_metrics\nORDER  BY avg_fee DESC;",
+      "external_knowledge": [
+        7,
+        50
+      ],
+      "type": "attribute_change",
+      "test_cases": [],
+      "category": "Query",
+      "difficulty_tier": "Hard"
+    },
+    "difficulty_tier": "Medium"
+  }
+]

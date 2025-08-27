@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+body {
+  font-family: 'Lato', sans-serif;  /* Ensure Lato font is applied */
+  color: var(--foreground);
+  background: var(--background);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 禁用黑夜模式，确保始终使用浅色模式 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #ffffff;  /* 强制使用白色背景 */
+    --foreground: #171717;  /* 强制使用深色字体 */
+  }
+}
+
+/* 添加响应式布局支持 */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;  /* 在小屏幕上调整字体大小 */
+  }
+}
