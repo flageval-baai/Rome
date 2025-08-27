@@ -1,13 +1,35 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";  // Import the Inter font
+import { Inter, Roboto, Open_Sans, Poppins } from "next/font/google";  // Import multiple font options
 import "./globals.css";
 import { getBasePath } from "@/utils/fileUtils";
 
-// Apply Inter font globally
+// Option 1: Inter 
 const inter = Inter({
-  variable: "--font-inter",  // Custom variable for the font
+  variable: "--font-inter",
   subsets: ["latin"],
 });
+
+// Option 2: Roboto 
+const roboto = Roboto({
+  variable: "--font-roboto",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+});
+
+// Option 3: Open Sans
+const openSans = Open_Sans({
+  variable: "--font-opensans",
+  subsets: ["latin"],
+});
+
+//Option 4: Poppins 
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const currentFont = inter;
 
 export const metadata: Metadata = {
   title: "ROME",
@@ -32,7 +54,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} antialiased`}  // Apply the Inter font here
+        className={`${currentFont.variable} antialiased font-sans`}  // Apply the selected font here
       >
         {children}
       </body>
