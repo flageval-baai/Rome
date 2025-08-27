@@ -8,7 +8,7 @@ const nextConfig = {
     unoptimized: true,
   },
   basePath: isGitHubPages ? '/Rome' : '',
-  assetPrefix: isGitHubPages ? '/Rome' : '',
+  assetPrefix: isGitHubPages ? '/Rome/' : '',
   eslint: {
     ignoreDuringBuilds: true,
   },
