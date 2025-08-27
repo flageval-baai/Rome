@@ -7,8 +7,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  basePath: isGitHubPages ? '/livesqlbench.github.io' : '',
-  assetPrefix: isGitHubPages ? '/livesqlbench.github.io/' : '',
+  basePath: isGitHubPages ? '/Rome' : '',
+  assetPrefix: isGitHubPages ? '/Rome/' : '',
   eslint: {
     ignoreDuringBuilds: true,
   },

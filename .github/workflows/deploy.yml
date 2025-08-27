@@ -28,9 +28,14 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run build # 如果 Next.js 配了 output:'export'，build 会直接生成 ./out
-        # 若没启 output:'export'，加一步 next export:
-        # - run: npm run export
+      - run: DEPLOY_TARGET=GH_PAGES npm run build # 设置环境变量
+      
+      # 添加.nojekyll文件，禁用GitHub Pages的Jekyll处理
+      - name: Add .nojekyll file
+        run: touch ./out/.nojekyll
+        
+      # 若没启 output:'export'，加一步 next export:
+      # - run: npm run export
 
       # ① 把静态文件打包成 artifact
       - name: Upload artifact
