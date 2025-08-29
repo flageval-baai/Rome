@@ -18,10 +18,20 @@ const LogoAndTitle = () => {
         </div> */}
         
         {/* Title positioned with negative margin to move it up */}
-        <h1 className="text-5xl font-extrabold -mt-8 bg-gradient-to-r from-[#F95454] to-[#0D92F4] bg-clip-text text-transparent">
-          <br></br>
-          ROME
-        </h1>
+        <div className="flex items-center justify-center gap-20 mt-4">
+          <h1 className="text-5xl font-extrabold leading-none bg-gradient-to-r from-[#F95454] to-[#0D92F4] bg-clip-text text-transparent">
+            LRM-Eval
+          </h1>
+          <div className="relative h-12 w-36 md:h-14 md:w-44">
+            <Image
+              src={`${getBasePath()}/FlagEval-logo.png`}
+              alt="FlagEval logo"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+        </div>
         <h2 className="text-2xl font-bold text-gray-900 mt-3 mb-3 leading-tight">
         A Preliminary Contamination-Free Evaluation of Reasoning Models
         </h2>

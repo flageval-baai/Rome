@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import type { DataEntry, KnowledgeEntry } from '@/utils/fileUtils';
 import SqlViewer from '@/components/SqlViewer';
 import QuantitativeResults from './components/QuantitativeResults';
+import FAQSection from './components/FAQSection';
 import DiscussionSection from './components/DiscussionSection';
 import StayTunedSection from './components/StayTunedSection';
 import RelatedArticles from './components/RelatedArticles';
@@ -39,6 +40,9 @@ export default function Page() {
       {/* Buttons and Content */}
       {/* <ButtonsAndContent /> */}
 
+      {/* FAQ Section */}
+      <FAQSection />
+
       {/* Introduction */}
       <Introduction />
 
@@ -48,9 +52,10 @@ export default function Page() {
       {/* Data Viewer */}
       {/* <DataViewer /> */}
       
-      {/* Quantitative Results */}
+      {/* Quantitative Results */
+      }
       <QuantitativeResults />
-      
+
       {/* Discussion Section */}
       <DiscussionSection />
       

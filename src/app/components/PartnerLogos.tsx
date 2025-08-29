@@ -6,13 +6,13 @@ const PartnerLogos = () => {
     <div className="flex justify-center items-center mb-8">
       <div className="relative h-10 w-24">
         <Image
-          src={`${getBasePath()}/bird_fig_main.png`}
+          src={`${getBasePath()}/FlagEval-logo.png`}
           alt="BIRD Team logo"
           fill
           className="object-contain"
         />
       </div>
-      <span className="text-gray-500">&</span>
+      {/* <span className="text-gray-500">&</span>
       <div className="relative h-10 w-24">
         <Image
           src={`${getBasePath()}/google-cloud-logo.png`}
@@ -20,7 +20,7 @@ const PartnerLogos = () => {
           fill
           className="object-contain"
         />
-      </div>
+      </div> */}
     </div>
   )
 }

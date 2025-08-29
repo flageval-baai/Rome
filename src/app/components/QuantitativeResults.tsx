@@ -14,12 +14,12 @@ interface ModelResult {
   hasReasoning: boolean;
 }
 
-type MainCategory = 'rome-v' | 'rome';
+type MainCategory = 'Visual Tasks' | 'Text Tasks';
 type RomeSubcategory = 'overall' | 'problem-solving' | 'algorithmic-coding' | 'task-completion' | 'factuality-abstention' | 'safety';
 type RomeVSubcategory = 'overall' | 'academic' | 'diagrams' | 'puzzles-game' | 'memes' | 'geolocation' | 'recognition' | 'multi-image' | 'spatial';
 
 const Leaderboard = () => {
-  const [activeMainCategory, setActiveMainCategory] = useState<MainCategory>('rome-v');
+  const [activeMainCategory, setActiveMainCategory] = useState<MainCategory>('Text Tasks');
   const [activeRomeTab, setActiveRomeTab] = useState<RomeSubcategory>('overall');
   const [activeRomeVTab, setActiveRomeVTab] = useState<RomeVSubcategory>('overall');
 
@@ -604,9 +604,72 @@ mistral-medium-3-1,15.9 ± 6.9,22.9 ± 4.5,16.7 ± 4.7,20.0 ± 4.1,27.6 ± 2.1,2
   // Rome-V dataset - Visual reasoning tasks parsed from CSV
   const romeVData: Record<RomeVSubcategory, ModelResult[]> = parseCSVToRomeVData();
 
-  // Sort function for models
-  const sortByCompletionRate = (a: ModelResult, b: ModelResult) => {
-    return b.completionRate - a.completionRate;
+  // 判断两个模型是否应该并列
+  const shouldTie = (model1: ModelResult, model2: ModelResult) => {
+    const acc1 = model1.completionRate;
+    const std1 = model1.standardDeviation;
+    const acc2 = model2.completionRate;
+    const std2 = model2.standardDeviation;
+    
+    // accuracy_2在accuracy_1-std，accuracy_1+std范围内
+    const condition1 = acc2 >= (acc1 - std1) && acc2 <= (acc1 + std1);
+    // accuracy_1在accuracy_2-std，accuracy_2+std范围内
+    const condition2 = acc1 >= (acc2 - std2) && acc1 <= (acc2 + std2);
+    
+    return condition1 && condition2;
+  };
+
+  // 将模型按并列规则分组并分配排名
+  const sortAndRankModels = (models: ModelResult[]) => {
+    // 首先按accuracy排序
+    const sorted = [...models].sort((a, b) => b.completionRate - a.completionRate);
+    
+    if (sorted.length === 0) return [];
+    
+    const groups: ModelResult[][] = [];
+    let currentGroup = [sorted[0]];
+    
+    for (let i = 1; i < sorted.length; i++) {
+      const currentModel = sorted[i];
+      
+      // 检查当前模型是否与当前组中的所有模型都满足并列条件
+      const canJoinGroup = currentGroup.every(groupModel => shouldTie(currentModel, groupModel));
+      
+      if (canJoinGroup) {
+        // 还需要检查加入这个模型后，组内所有模型是否仍然满足两两并列的条件
+        const potentialGroup = [...currentGroup, currentModel];
+        const allTied = potentialGroup.every((model1, index1) => 
+          potentialGroup.every((model2, index2) => 
+            index1 === index2 || shouldTie(model1, model2)
+          )
+        );
+        
+        if (allTied) {
+          currentGroup.push(currentModel);
+        } else {
+          groups.push(currentGroup);
+          currentGroup = [currentModel];
+        }
+      } else {
+        groups.push(currentGroup);
+        currentGroup = [currentModel];
+      }
+    }
+    
+    groups.push(currentGroup);
+    
+    // 分配排名
+    const rankedModels: (ModelResult & { rank: number })[] = [];
+    let currentRank = 1;
+    
+    for (const group of groups) {
+      for (const model of group) {
+        rankedModels.push({ ...model, rank: currentRank });
+      }
+      currentRank += group.length;
+    }
+    
+    return rankedModels;
   };
 
   // Get organization color
@@ -625,10 +688,10 @@ mistral-medium-3-1,15.9 ± 6.9,22.9 ± 4.5,16.7 ± 4.7,20.0 ± 4.1,27.6 ± 2.1,2
 
   // Get current data based on active category and tab
   const getCurrentData = () => {
-    if (activeMainCategory === 'rome') {
-      return romeData[activeRomeTab].sort(sortByCompletionRate);
+    if (activeMainCategory === 'Text Tasks') {
+      return sortAndRankModels(romeData[activeRomeTab]);
     } else {
-      return romeVData[activeRomeVTab].sort(sortByCompletionRate);
+      return sortAndRankModels(romeVData[activeRomeVTab]);
     }
   };
 
@@ -649,34 +712,34 @@ mistral-medium-3-1,15.9 ± 6.9,22.9 ± 4.5,16.7 ± 4.7,20.0 ± 4.1,27.6 ± 2.1,2
         <div className="mb-6">
           <div className="flex justify-center space-x-4">
             <button
-              onClick={() => setActiveMainCategory('rome-v')}
+              onClick={() => setActiveMainCategory('Text Tasks')}
               className={`px-6 py-3 rounded-lg text-lg font-semibold transition-colors ${
-                activeMainCategory === 'rome-v'
-                  ? 'bg-purple-500 text-white shadow-md'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              ROME-V
-            </button>
-            <button
-              onClick={() => setActiveMainCategory('rome')}
-              className={`px-6 py-3 rounded-lg text-lg font-semibold transition-colors ${
-                activeMainCategory === 'rome'
+                activeMainCategory === 'Text Tasks'
                   ? 'bg-blue-500 text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              ROME
+              Text Tasks
+            </button>
+            <button
+              onClick={() => setActiveMainCategory('Visual Tasks')}
+              className={`px-6 py-3 rounded-lg text-lg font-semibold transition-colors ${
+                activeMainCategory === 'Visual Tasks'
+                  ? 'bg-purple-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Visual Tasks
             </button>
           </div>
         </div>
 
         {/* Task Types Illustration */}
         <div className="mb-8">
-          <h3 className="text-lg font-semibold text-center mb-4 text-gray-800">
+          {/* <h3 className="text-lg font-semibold text-center mb-4 text-gray-800">
             {activeMainCategory === 'rome' ? 'Text-based Reasoning Tasks' : 'Visual Reasoning Tasks'}
-          </h3>
-          {activeMainCategory === 'rome' ? (
+          </h3> */}
+          {activeMainCategory === 'Text Tasks' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-w-6xl mx-auto">
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                 <h4 className="font-medium text-blue-900 mb-1">Problem solving</h4>
@@ -766,7 +829,7 @@ mistral-medium-3-1,15.9 ± 6.9,22.9 ± 4.5,16.7 ± 4.7,20.0 ± 4.1,27.6 ± 2.1,2
 
             {/* Subcategory Tabs */}
             <div className="flex flex-wrap gap-2 mb-4 justify-center">
-              {activeMainCategory === 'rome-v' ? (
+              {activeMainCategory === 'Visual Tasks' ? (
                 [
                   { id: 'overall', label: 'Overall', colors: 'bg-gray-100 text-gray-700 border-gray-200' },
                   { id: 'academic', label: 'Academic', colors: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
@@ -841,20 +904,20 @@ mistral-medium-3-1,15.9 ± 6.9,22.9 ± 4.5,16.7 ± 4.7,20.0 ± 4.1,27.6 ± 2.1,2
                       <tr 
                         key={model.name}
                         className={`border-b hover:bg-gray-50 transition-colors ${
-                          index === 0 ? 'bg-blue-50' : 
-                          activeMainCategory === 'rome' ? 'bg-blue-50/30' : 'bg-purple-50/30'
+                          model.rank === 1 ? 'bg-blue-50' : 
+                          activeMainCategory === 'Text Tasks' ? 'bg-blue-50/30' : 'bg-purple-50/30'
                         }`}
                       >
                         <td className="py-2 px-4 align-middle text-center">
                           {model.completionRate > 0 ? (
                             <div className="flex items-center justify-center gap-1">
-                              {index === 0 && <span className="text-yellow-500">🥇</span>}
-                              {index === 1 && <span className="text-gray-400">🥈</span>}
-                              {index === 2 && <span className="text-amber-600">🥉</span>}
+                              {model.rank === 1 && <span className="text-yellow-500">🥇</span>}
+                              {model.rank === 2 && <span className="text-gray-400">🥈</span>}
+                              {model.rank === 3 && <span className="text-amber-600">🥉</span>}
                               <span className={`font-medium ${
-                                index < 3 ? 'text-gray-700' : 'text-gray-500'
+                                model.rank <= 3 ? 'text-gray-700' : 'text-gray-500'
                               }`}>
-                                {index + 1}
+                                {model.rank}
                               </span>
                             </div>
                           ) : (
@@ -904,14 +967,14 @@ mistral-medium-3-1,15.9 ± 6.9,22.9 ± 4.5,16.7 ± 4.7,20.0 ± 4.1,27.6 ± 2.1,2
             </div>
             
             <p className="mt-4 text-sm text-gray-600">
-              <span className="font-medium">Note:</span> {activeMainCategory === 'rome' 
+              <span className="font-medium">Note:</span> {activeMainCategory === 'Text Tasks' 
                 ? 'ROME evaluates text-based reasoning capabilities across algorithmic coding, problem solving, mathematical reasoning, and logical inference tasks.'
                 : 'ROME-V evaluates visual reasoning capabilities across geographic understanding, meme interpretation, spatial reasoning, visual analysis, and chart comprehension tasks.'
-              } Models with reasoning ability are marked with black-and-white logos.
+              } 
             </p>
             <p className="mt-4 text-sm text-gray-600">
               <span className="font-medium">Evaluation:</span> Accuracy is calculated as the percentage of tasks correctly completed. 
-              {activeMainCategory === 'rome' 
+              {activeMainCategory === 'Text Tasks' 
                 ? ' Tasks include code generation, mathematical proofs, logical deduction, and complex problem-solving scenarios.'
                 : ' Tasks involve interpreting images, understanding visual relationships, analyzing charts, and processing multimodal information.'
               }
